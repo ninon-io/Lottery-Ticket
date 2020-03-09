@@ -1,18 +1,11 @@
 import numpy as np
 import torch
-import torchvision
 import matplotlib.pyplot as plt
+
 from time import time
 from torchvision import datasets
 from torchvision import transforms
 from torch import nn, optim
-import urllib3
-from urllib.request import urlopen, Request
-
-header = {'Mozilla/73.0.1'}
-reg_url = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
-req = Request(url=reg_url, headers=header)
-html = urlopen(req).read()
 
 transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
                                 transforms.Normalize((0.5,), (0.5,))])  # norm tensor w/  mean and standard deviation
@@ -35,7 +28,7 @@ print(labels.shape)
 # Plot some images from the database
 figure = plt.figure()
 num_of_images = 60
-for index in range(1, num_of_images+1):
+for index in range(1, num_of_images + 1):
     plt.subplot(6, 10, index)
     plt.axis('off')
     plt.imshow(images[0].np().squeeze(), cmap='gray_r')
