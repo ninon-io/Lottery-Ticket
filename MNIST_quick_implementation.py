@@ -1,91 +1,133 @@
+from __future__ import print_function
 import torch
-import matplotlib.pyplot as plt
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import argparse
 import numpy
+import matplotlib.pyplot as plt
+
 
 from time import time
 from torchvision import datasets
 from torchvision import transforms
-from torch import nn, optim, functional as F
 
-transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
-                                transforms.Normalize((0.5,), (0.5,))])  # norm tensor w/  mean and standard deviation
+parser = argparse.ArgumentParser(description='Pytorch Mnist Wrapped')
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+                    help='input batch size for training (default: 64)')
+parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
+                    help='input batch size for testing (default: 1000)')
+parser.add_argument('--epochs', type=int, default=14, metavar='N',
+                    help='number of epochs to train (default: 14)')
+parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
+                    help='learning rate (default: 1.0)')
+parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
+                    help='Learning rate step gamma (default: 0.7)')
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='disables CUDA training')
+parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 1)')
+parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+                    help='how many batches to wait before logging training status')
 
-train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
+parser.add_argument('--save-model', action='store_true', default=False,
+                    help='For Saving the current Model')
+args = parser.parse_args()
+use_cuda = not args.no_cuda and torch.cuda.is_available()
 
-test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
+torch.manual_seed(args.seed)
 
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
+device = torch.device("cuda" if use_cuda else "cpu")
 
-test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
 
-data_iter = iter(train_loader)
-images, labels = data_iter.next()
+class NNet(nn.Module):
+    def __init__(self):
+        super(NNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.dropout1 = nn.Dropout2d(0.25)
+        self.dropout2 = nn.Dropout2d(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
 
-# Display the size of tensors
-print(images.shape)
-print(labels.shape)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        out_put = F.log_softmax(x, dim=1)
+        return out_put
 
-# Plot some images from the database
-figure = plt.figure()
-num_of_images = 3
-for index in range(1, num_of_images + 1):
-    plt.subplot(6, 10, index)
-    plt.axis('off')
-    plt.imshow(images[0].numpy().squeeze(), cmap='gray_r')
-    plt.show()
 
-# Define the neural network
-INPUT_SIZE = 784
-HIDDEN_SIZE = [128, 64]
-OUTPUT_SIZE = 10
-
-model = nn.Sequential(nn.Linear(INPUT_SIZE, HIDDEN_SIZE[0]),
-                      nn.ReLU(),
-                      nn.Linear(HIDDEN_SIZE[0], HIDDEN_SIZE[1]),
-                      nn.ReLU(),
-                      nn.Linear(HIDDEN_SIZE[1], OUTPUT_SIZE),
-                      nn.LogSoftmax(dim=1))
-print(model)
-
-# Definition of Loss
-criterion = nn.NLLLoss()
-images, labels = next(iter(train_loader))
-images = images.view(images.shape[0], -1)
-
-logps = model(images)  # log probabilities
-loss = criterion(logps, labels)  # calculate the NLL loss
-
-# Comment when Lottery Ticket applied
-print('before backward pass: \n', model[0].weight.grad)
-loss.backward()
-print('after backward pass: \n', model[0].weight.grad)
-
-# Core Training Process
-optimizer = optim.SGD(model.parameters(), lr = 0.003, momentum = 0.9)
-time0 = time()
-EPOCHS = 15
-for e in range(EPOCHS):
-    running_loss = 0
-    for images, labels in train_loader:
-        # Flatten MNIST images into a long vector of 784
-        images = images.view(images.shape[0], -1)
-
-        # Training Pass
+def train(args, model, device, train_loader, optimizer, epoch):
+    model.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        data, target = data.to(device), target.to(device)
+        # Training pass
         optimizer.zero_grad()
-
-        output = model(images)
-        loss = criterion(output, labels)
-
-        # Learning by back-propagation
+        output = model(data)
+        loss = F.nll_loss(output, target)
+        # Learning with back-propagation
         loss.backward()
-
-        # Optimization of the weights
+        # Optimizes weights
         optimizer.step()
+        if batch_idx % args.log_interval == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item()))
 
-        running_loss += loss.item()
-    else:
-        print('Epoch {} - Training loss: {}'.format(e, running_loss/len(train_loader)))
 
-print('runing time = ', (time() - time0)/60)
+def test(args, model, device, test_loader):
+    model.eval()
+    test_loss = 0
+    correct = 0
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+            correct += pred.eq(target.view_as(pred)).sum().item()
 
-images, labels = next(iter(
+    test_loss /= len(test_loader.dataset)
+
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        test_loss, correct, len(test_loader.dataset),
+        100. * correct / len(test_loader.dataset)))
+
+
+def main():
+    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+    transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
+                                    transforms.Normalize((0.5,),
+                                                         (0.5,))])  # norm tensor w/  mean and standard deviation
+    train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
+    test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
+
+    model = NNet().to(device)
+    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.gamma)
+    time0 = time()
+    for epoch in range(1, args.epochs + 1):
+        train(args, model, device, train_loader,  optimizer, epoch)
+        test(args, model, device, test_loader)
+        scheduler.step()
+
+    print("\nTraining Time (in minutes) =", (time() - time0) / 60)
+
+    if args.save_model:
+        torch.save(model.state_dict(), "mnist_cnn.pt")
+
+
+if __name__ == '__main__':
+    main()
