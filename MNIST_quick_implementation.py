@@ -1,9 +1,14 @@
 from __future__ import print_function
 import torch
 import torch.nn as nn
+import torch.nn.utils
+# import torch.nn.utils.prune as prune
 import torch.nn.functional as F
 import torch.optim as optim
 import argparse
+import collections
+from collections import OrderedDict
+import seaborn as sns
 import numpy
 import matplotlib.pyplot as plt
 
@@ -12,12 +17,17 @@ from time import time
 from torchvision import datasets
 from torchvision import transforms
 
+
+# Plotting Style
+# sns.set_style('darkgrid')
+
+
 parser = argparse.ArgumentParser(description='Pytorch Mnist Wrapped')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=14, metavar='N',
+parser.add_argument('--epochs', type=int, default=2, metavar='N',
                     help='number of epochs to train (default: 14)')
 parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                     help='learning rate (default: 1.0)')
@@ -29,8 +39,9 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
-
-parser.add_argument('--save-model', action='store_true', default=False,
+parser.add_argument('--pruning--', type=int, default=10, metavar='P',
+                    help='percentage of pruning for each cycle (default: 10)')
+parser.add_argument('--save-model', action='store_true', default=True,
                     help='For Saving the current Model')
 args = parser.parse_args()
 use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -43,6 +54,18 @@ device = torch.device("cuda" if use_cuda else "cpu")
 class NNet(nn.Module):
     def __init__(self):
         super(NNet, self).__init__()
+        self.sequential = nn.Sequential(OrderedDict([
+            ('conv1', nn.Conv2d(1, 32, 3, 1)),
+            ('relu1', nn.ReLU()),
+            ('conv2', nn.Conv2d(32, 64, 3, 1)),
+            ('relu2', nn.ReLU()),
+            ('max_pool', nn.MaxPool2d(2)),
+            ('drop1', nn.Dropout(0.25)),
+            ('drop2', nn.Dropout(0.5)),
+            ('linear1', nn.Linear(9216, 128)),
+            ('linear2', nn.Linear(128, 10))
+        ]))
+        # if does not work with nn.Sequential
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
         self.conv2 = nn.Conv2d(32, 64, 3, 1)
         self.dropout1 = nn.Dropout2d(0.25)
@@ -57,13 +80,19 @@ class NNet(nn.Module):
         x = F.relu(x)
         x = F.max_pool2d(x, 2)
         x = self.dropout1(x)
-        x = torch.flatten(x, 1)
+        x = torch.flatten(x, 1)  # find how to sequentially flatt
         x = self.fc1(x)
         x = F.relu(x)
         x = self.dropout2(x)
         x = self.fc2(x)
         out_put = F.log_softmax(x, dim=1)
         return out_put
+
+
+# model = NNet().to(device=device)
+# module = model.conv1
+# print(list(module.named_parameters()))
+# print(list(module.named_buffers()))
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -103,6 +132,9 @@ def test(args, model, device, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
+MODEL_FILENAME = "mnist_cnn.pt"
+
+
 def main():
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
@@ -123,10 +155,29 @@ def main():
         test(args, model, device, test_loader)
         scheduler.step()
 
+    # Experiments
     print("\nTraining Time (in minutes) =", (time() - time0) / 60)
-
     if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
+        torch.save(model.state_dict(), MODEL_FILENAME)
+
+
+# reverse operation
+model = torch.load(MODEL_FILENAME)
+model.load_state_dict(torch.load(MODEL_FILENAME))
+# Print model's state dict
+print("Model's State dict:")
+for param_tensor in model.state_dict():
+    print('--Sizes of tensor--', param_tensor, "\t", model.state_dict()[param_tensor].size())  # Access to sizes
+    print('--Weights--', param_tensor, "\t", list(model.state_dict()[param_tensor]))  # Access to weights
+    # Normalization of weights
+    raw_weights = model.load.state_dict()[param_tensor]
+    print('raw weights', raw_weights)
+
+    # Uncomment if experiments on optimizers
+    # Print optimizer's state dict
+    # print("Optimizer State dict:")
+    # for var_name in optimizer.state_dict():
+    #     print(var_name, "\t", optimizer.state_dict()[var_name])
 
 
 if __name__ == '__main__':
