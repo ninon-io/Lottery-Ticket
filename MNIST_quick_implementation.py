@@ -2,7 +2,7 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.nn.utils
-# import torch.nn.utils.prune as prune
+# import torch.nn.utils.prune as prune # super cheat
 import torch.nn.functional as F
 import torch.optim as optim
 import argparse
@@ -17,6 +17,10 @@ from time import time
 from torchvision import datasets
 from torchvision import transforms
 
+# https://towardsdatascience.com/everything-you-need-to-know-about-saving-weights-in-pytorch-572651f3f8de
+# http://ttt.ircam.fr/openvpn.html
+# For freezing weights go to the first website
+
 
 # Plotting Style
 # sns.set_style('darkgrid')
@@ -27,7 +31,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=2, metavar='N',
+parser.add_argument('--epochs', type=int, default=3, metavar='N',
                     help='number of epochs to train (default: 14)')
 parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                     help='learning rate (default: 1.0)')
@@ -54,17 +58,18 @@ device = torch.device("cuda" if use_cuda else "cpu")
 class NNet(nn.Module):
     def __init__(self):
         super(NNet, self).__init__()
-        self.sequential = nn.Sequential(OrderedDict([
-            ('conv1', nn.Conv2d(1, 32, 3, 1)),
-            ('relu1', nn.ReLU()),
-            ('conv2', nn.Conv2d(32, 64, 3, 1)),
-            ('relu2', nn.ReLU()),
-            ('max_pool', nn.MaxPool2d(2)),
-            ('drop1', nn.Dropout(0.25)),
-            ('drop2', nn.Dropout(0.5)),
-            ('linear1', nn.Linear(9216, 128)),
-            ('linear2', nn.Linear(128, 10))
-        ]))
+        # self.sequential = nn.Sequential(OrderedDict([
+        #     ('conv1', nn.Conv2d(1, 32, 3, 1)),
+        #     ('relu1', nn.ReLU()),
+        #     ('conv2', nn.Conv2d(32, 64, 3, 1)),
+        #     ('relu2', nn.ReLU()),
+        #     ('max_pool', nn.MaxPool2d(2)),
+        #     ('drop1', nn.Dropout(0.25)),
+        #     ('flatten', nn.Linear(9216, 128)),
+        #     ('relu3', nn.ReLU()),
+        #     ('drop2', nn.Dropout(0.5)),
+        #     ('linear2', nn.Linear(128, 10))
+        # ]))
         # if does not work with nn.Sequential
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
         self.conv2 = nn.Conv2d(32, 64, 3, 1)
@@ -74,6 +79,8 @@ class NNet(nn.Module):
         self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x):
+        # out_put = self.sequential(x)
+        # out_put = out_put.view(out_put.size()[0], -1)
         x = self.conv1(x)
         x = F.relu(x)
         x = self.conv2(x)
@@ -89,7 +96,7 @@ class NNet(nn.Module):
         return out_put
 
 
-# model = NNet().to(device=device)
+model = NNet().to(device=device)
 # module = model.conv1
 # print(list(module.named_parameters()))
 # print(list(module.named_buffers()))
@@ -132,10 +139,27 @@ def test(args, model, device, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
-MODEL_FILENAME = "mnist_cnn.pt"
+ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
+MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 
 
 def main():
+    model = NNet().to(device=device)
+    print("-----Model's State dict before training-----")
+    for name, param in model.named_parameters():
+        print('name: ', name)
+        print(type(param))
+        print('param.shape: ', param.shape)
+        print('param.requires_grad: ', param.requires_grad)
+        print('=====')
+    print('-----for Conv1------')
+    module = model.conv1
+    print(list(module.named_parameters()))
+    # for module in model.named_parameters:
+    #     print(module, ':-----')
+    #     print(list(module.named_parameters()))
+    #     print(model)
+    print("----------")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
                                     transforms.Normalize((0.5,),
@@ -155,29 +179,45 @@ def main():
         test(args, model, device, test_loader)
         scheduler.step()
 
-    # Experiments
+    # Saving models
     print("\nTraining Time (in minutes) =", (time() - time0) / 60)
     if args.save_model:
-        torch.save(model.state_dict(), MODEL_FILENAME)
+        torch.save(model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
+        torch.save(model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
 
 # reverse operation
-model = torch.load(MODEL_FILENAME)
-model.load_state_dict(torch.load(MODEL_FILENAME))
+model_new_weights = NNet()
+model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
+# model_new = torch.load(MODEL_FILENAME)
+# model.load_state_dict(torch.load(MODEL_FILENAME))
 # Print model's state dict
-print("Model's State dict:")
-for param_tensor in model.state_dict():
-    print('--Sizes of tensor--', param_tensor, "\t", model.state_dict()[param_tensor].size())  # Access to sizes
-    print('--Weights--', param_tensor, "\t", list(model.state_dict()[param_tensor]))  # Access to weights
-    # Normalization of weights
-    raw_weights = model.load.state_dict()[param_tensor]
-    print('raw weights', raw_weights)
+print("-----Model's State dict after training-----")
+for name, param in model_new_weights.named_parameters():
+    print(name, ':', param.requires_grad)
+print(model_new_weights)
+print('------Weights for conv1------')
+module = model_new_weights.conv1
+print(list(module.named_parameters()))
+print('==================================')
+print('Normalization')
+print('==================================')
 
-    # Uncomment if experiments on optimizers
-    # Print optimizer's state dict
-    # print("Optimizer State dict:")
-    # for var_name in optimizer.state_dict():
-    #     print(var_name, "\t", optimizer.state_dict()[var_name])
+# Normalization of weights
+# modules = ['conv1', 'conv2', 'dropout1', 'dropout2', 'fc1', 'fc2']
+for i in model_new_weights.named_parameters():
+    print('-------', i, '--------')
+    print(list(module.named_parameters()))
+    norm_weights = torch.norm(model_new_weights.named_parameters[0]())
+    print(norm_weights)
+print('genius')
+
+
+# Uncomment if experiments on optimizers
+# Print optimizer's state dict
+# print("Optimizer State dict:")
+# for var_name in optimizer.state_dict():
+#     print(var_name, "\t", optimizer.state_dict()[var_name])
 
 
 if __name__ == '__main__':
