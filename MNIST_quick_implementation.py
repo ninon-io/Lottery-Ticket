@@ -9,8 +9,9 @@ import argparse
 import collections
 from collections import OrderedDict
 import seaborn as sns
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
+import re
 
 
 from time import time
@@ -21,6 +22,13 @@ from torchvision import transforms
 # http://ttt.ircam.fr/openvpn.html
 # For freezing weights go to the first website
 
+# https://adventuresinmachinelearning.com/convolutional-neural-networks-tutorial-in-pytorch/
+# Excellent explanation
+
+# https://adventuresinmachinelearning.com/vanishing-gradient-problem-tensorflow/
+# The Vanishing Gradient Problem TO READ
+
+# https://www.learnpython.org/en/ String Formatting
 
 # Plotting Style
 # sns.set_style('darkgrid')
@@ -55,6 +63,7 @@ torch.manual_seed(args.seed)
 device = torch.device("cuda" if use_cuda else "cpu")
 
 
+# Skeleton of the network
 class NNet(nn.Module):
     def __init__(self):
         super(NNet, self).__init__()
@@ -78,6 +87,7 @@ class NNet(nn.Module):
         self.fc1 = nn.Linear(9216, 128)
         self.fc2 = nn.Linear(128, 10)
 
+# How the data flow in the network
     def forward(self, x):
         # out_put = self.sequential(x)
         # out_put = out_put.view(out_put.size()[0], -1)
@@ -87,7 +97,7 @@ class NNet(nn.Module):
         x = F.relu(x)
         x = F.max_pool2d(x, 2)
         x = self.dropout1(x)
-        x = torch.flatten(x, 1)  # find how to sequentially flatt
+        x = torch.flatten(x, 1)  # find how to sequentially flatt, prob not possible...?
         x = self.fc1(x)
         x = F.relu(x)
         x = self.dropout2(x)
@@ -97,9 +107,16 @@ class NNet(nn.Module):
 
 
 model = NNet().to(device=device)
+# Check the architecture
+print(NNet)
+
 # module = model.conv1
 # print(list(module.named_parameters()))
 # print(list(module.named_buffers()))
+
+# Possible to define here:
+# optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+# criterion = F.nll_loss()
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -107,13 +124,13 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         # Training pass
-        optimizer.zero_grad()
+        optimizer.zero_grad()  # Initialization of weights TO MODIFY IN ORDER TO RESET WEIGHTS NOT TO ZEROS
         output = model(data)
-        loss = F.nll_loss(output, target)
+        loss = F.nll_loss(output, target)  # Equivalent to criterion: loss = criterion(output, target)
         # Learning with back-propagation
-        loss.backward()
+        loss.backward()  # Here the matching size is very important
         # Optimizes weights
-        optimizer.step()
+        optimizer.step()  # Gradient descend step accordingly to the backward propagation
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -124,7 +141,7 @@ def test(args, model, device, test_loader):
     model.eval()
     test_loss = 0
     correct = 0
-    with torch.no_grad():
+    with torch.no_grad():  # Disable autograd functionality (error gradients and backpropagation calculation) not needed
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
@@ -189,27 +206,45 @@ def main():
 # reverse operation
 model_new_weights = NNet()
 model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
-# model_new = torch.load(MODEL_FILENAME)
-# model.load_state_dict(torch.load(MODEL_FILENAME))
+# model_new = torch.load(ENTIRE_MODEL_FILENAME)
+# model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
+
 # Print model's state dict
 print("-----Model's State dict after training-----")
-for name, param in model_new_weights.named_parameters():
-    print(name, ':', param.requires_grad)
-print(model_new_weights)
-print('------Weights for conv1------')
-module = model_new_weights.conv1
-print(list(module.named_parameters()))
-print('==================================')
-print('Normalization')
-print('==================================')
+# for name, param in model_new_weights.named_parameters():
+#     print('==========')
+#     print(name, ':', param.requires_grad)
+#     print('==========')
 
 # Normalization of weights
 # modules = ['conv1', 'conv2', 'dropout1', 'dropout2', 'fc1', 'fc2']
-for i in model_new_weights.named_parameters():
-    print('-------', i, '--------')
-    print(list(module.named_parameters()))
-    norm_weights = torch.norm(model_new_weights.named_parameters[0]())
-    print(norm_weights)
+for layer in model_new_weights.named_parameters():
+    print('=========', layer, '==========')
+    print('=====', model_new_weights.named_parameters(), '====')
+
+print('========================= WORKING LOOP ================================')
+modules = ['conv1', 'conv2', 'fc1', 'fc2']
+weights_array = []
+for layer in modules:
+    print('=================LOCAL=================')
+    weight_layer = getattr(model_new_weights, layer).weight
+    print(weight_layer)
+    print('================GLOBAL================')
+    weights_array += torch.cat(getattr(model_new_weights, layer).weight, 0)
+    print(getattr(model_new_weights, layer).shape)
+print('=========================================================')
+
+# print(list(module.named_parameters(layer)))
+# norm_weights = torch.norm(model_new_weights.named_parameters('weight'))
+# print(norm_weights)
+
+print('==================================')
+print('Normalization')
+print('==================================')
+print('plouf')
+# print(model_new_weights.named_parameters('weight'))
+print('===============================================')
+
 print('genius')
 
 
@@ -220,5 +255,6 @@ print('genius')
 #     print(var_name, "\t", optimizer.state_dict()[var_name])
 
 
-if __name__ == '__main__':
-    main()
+# Uncomment if desired training
+# if __name__ == '__main__':
+#     main()
