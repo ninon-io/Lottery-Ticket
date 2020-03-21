@@ -209,52 +209,6 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model_new = torch.load(ENTIRE_MODEL_FILENAME)
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
-# Print model's state dict
-print("-----Model's State dict after training-----")
-# for name, param in model_new_weights.named_parameters():
-#     print('==========')
-#     print(name, ':', param.requires_grad)
-#     print('==========')
 
-# Normalization of weights
-# modules = ['conv1', 'conv2', 'dropout1', 'dropout2', 'fc1', 'fc2']
-for layer in model_new_weights.named_parameters():
-    print('=========', layer, '==========')
-    print('=====', model_new_weights.named_parameters(), '====')
-
-print('========================= WORKING LOOP ================================')
-modules = ['conv1', 'conv2', 'fc1', 'fc2']
-weights_array = []
-for layer in modules:
-    print('=================LOCAL=================')
-    weight_layer = getattr(model_new_weights, layer).weight
-    print(weight_layer)
-    print('================GLOBAL================')
-    weights_array += torch.cat(getattr(model_new_weights, layer).weight, 0)
-    print(getattr(model_new_weights, layer).shape)
-print('=========================================================')
-
-# print(list(module.named_parameters(layer)))
-# norm_weights = torch.norm(model_new_weights.named_parameters('weight'))
-# print(norm_weights)
-
-print('==================================')
-print('Normalization')
-print('==================================')
-print('plouf')
-# print(model_new_weights.named_parameters('weight'))
-print('===============================================')
-
-print('genius')
-
-
-# Uncomment if experiments on optimizers
-# Print optimizer's state dict
-# print("Optimizer State dict:")
-# for var_name in optimizer.state_dict():
-#     print(var_name, "\t", optimizer.state_dict()[var_name])
-
-
-# Uncomment if desired training
 # if __name__ == '__main__':
 #     main()
