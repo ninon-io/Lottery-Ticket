@@ -1,6 +1,9 @@
 from __future__ import print_function
+import torch
 import torch.nn.utils
 from MNIST_quick_implementation import NNet
+import math
+import argparse
 
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
@@ -11,11 +14,16 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model_new = torch.load(ENTIRE_MODEL_FILENAME)
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
+parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
+parser.add_argument('--pruning_percent--', type=int, default=10, metavar='P',
+                    help='percentage of pruning for each cycle (default: 10)')
 
-# Architecture problem as I want the call of method being an argument associate with the class ?
+
+# Architecture problem as I want the call of method being an argument (cf up) associate with the class ?
 class Pruning:
     def __init__(self):
         self.modules = ['conv1', 'conv2', 'fc1', 'fc2']
+        # self.pruning_percent = args.pruning_percent  # How to call here the argparse ????
 
     def __global_pruning__(self):
         # Work in progress on weights from different layers
@@ -66,12 +74,7 @@ class Pruning:
             print('Tensors local number of elements: ', weights_array_local.numel())
             abs_weights = torch.Tensor.abs(weights_array_local_ranked[0])
             print('ABS', abs_weights, abs_weights.numel())
-            # masked_weight = torch.scatter() TO CONTINUE HERE
             print('================END LOCAL================')
-
-        # print(list(module.named_parameters(layer)))
-        # norm_weights = torch.norm(model_new_weights.named_parameters('weight'))
-        # print(norm_weights)
 
         print('genius')
 
@@ -80,6 +83,28 @@ test_1 = Pruning()
 # test_1.__global_pruning__()
 test_1.__local_pruning__()
 
+print("========== TEST PLAYGROUND ==========")
+pruning_percentage = 50  # To put as an argument for the user
+testing_tensor = torch.randn(3, 4)
+print(testing_tensor)
+abs_test = torch.Tensor.abs(testing_tensor)
+print(abs_test)
+shaped_tensor = abs_test.view(-1)
+print('shaped', shaped_tensor)
+rank_tensor = torch.sort(shaped_tensor)
+print(rank_tensor)
+masking_value = rank_tensor[0][math.floor(rank_tensor[0].numel() * pruning_percentage / 100)]
+print('mask:', masking_value)
+mask_bool = abs_test.ge(masking_value)
+print('mask bool', mask_bool[0][0])
+# Somehow better method to change boolean tensor into int tensor
+for i, j in mask_bool[:][:]:
+    if mask_bool[i][j]:
+        mask_bool[i][j] = 1
+    if not mask_bool[i][j]:
+        mask_bool[i][j] = 0
+mask = mask_bool
+print('mask:', mask)
 
 # Print model's state dict
 # print("-----Model's State dict after training-----")
