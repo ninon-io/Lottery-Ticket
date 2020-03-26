@@ -32,9 +32,9 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=2, metavar='N',
+parser.add_argument('--epochs', type=int, default=1, metavar='N',
                     help='number of epochs to train (default: 14)')
-parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
+parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 1.0)')
 parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
                     help='Learning rate step gamma (default: 0.7)')
@@ -46,19 +46,19 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--save-model', action='store_true', default=True,
                     help='For Saving the current Model')
+parser.add_argument('--momentum', type=float, default=0.5,
+                    help='For Saving the current Model')
+
 args = parser.parse_args()
 use_cuda = not args.no_cuda and torch.cuda.is_available()
-
 torch.manual_seed(args.seed)
-
 device = torch.device("cuda" if use_cuda else "cpu")
-
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}  # Don't understand that
 
 # DataLoader prep
 transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
-                                transforms.Normalize((0.5,),
-                                                     (0.5,))])  # norm tensor w/  mean and standard deviation
+                                transforms.Normalize((0.1307,),
+                                                     (0.3081,))])  # norm tensor w/  mean and standard deviation
 train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
 test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
@@ -69,50 +69,27 @@ test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
 class NNet(nn.Module):
     def __init__(self):
         super(NNet, self).__init__()
-        # self.sequential = nn.Sequential(OrderedDict([
-        #     ('conv1', nn.Conv2d(1, 32, 3, 1)),
-        #     ('relu1', nn.ReLU()),
-        #     ('conv2', nn.Conv2d(32, 64, 3, 1)),
-        #     ('relu2', nn.ReLU()),
-        #     ('max_pool', nn.MaxPool2d(2)),
-        #     ('drop1', nn.Dropout(0.25)),
-        #     ('flatten', nn.Linear(9216, 128)),
-        #     ('relu3', nn.ReLU()),
-        #     ('drop2', nn.Dropout(0.5)),
-        #     ('linear2', nn.Linear(128, 10))
-        # ]))
-        # if does not work with nn.Sequential
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.dropout1 = nn.Dropout2d(0.25)
-        self.dropout2 = nn.Dropout2d(0.5)
-        self.fc1 = nn.Linear(9216, 128)
-        self.fc2 = nn.Linear(128, 10)
+        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.dropout = nn.Dropout2d()
+        self.fc1 = nn.Linear(320, 50)
+        self.fc2 = nn.Linear(50, 10)
 
 # How the data flow in the network
     def forward(self, x):
-        # out_put = self.sequential(x)
-        # out_put = out_put.view(out_put.size()[0], -1)
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.conv2(x)
-        x = F.relu(x)
-        x = F.max_pool2d(x, 2)
-        x = self.dropout1(x)
-        x = torch.flatten(x, 1)  # find how to sequentially flatt, prob not possible...?
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.dropout2(x)
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.dropout(self.conv2(x)), 2))
+        x = x.view(-1, 320)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
         x = self.fc2(x)
         out_put = F.log_softmax(x, dim=1)
         return out_put
 
 
 # Initialization
-# criterion = F.nll_loss()
 model = NNet().to(device=device)
-optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.gamma)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 
 # Keeping track of the progress
@@ -122,7 +99,7 @@ test_losses = []
 test_counter = [i*len(train_loader.dataset) for i in range(args.epochs + 1)]
 
 
-def train(args, model, device, train_loader, optimizer, epoch):
+def train(epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
@@ -138,12 +115,12 @@ def train(args, model, device, train_loader, optimizer, epoch):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
-            train_losses.append(loss.item)
+            train_losses.append(loss.item())
             train_counter.append(
                 (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
 
 
-def test(args, model, device, test_loader):
+def test():
     model.eval()
     test_loss = 0
     correct = 0
@@ -154,10 +131,8 @@ def test(args, model, device, test_loader):
             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
-
     test_loss /= len(test_loader.dataset)
     test_losses.append(test_loss)
-
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
@@ -170,10 +145,10 @@ MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 def main():
     model = NNet().to(device=device)
     time0 = time()
+    test()
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader,  optimizer, epoch)
-        test(args, model, device, test_loader)
-        scheduler.step()
+        train(epoch)
+        test()
 
     # Saving models
     print("\nTraining Time (in minutes) =", (time() - time0) / 60)
@@ -182,8 +157,11 @@ def main():
         torch.save(model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
 
-# Data and results visualisation
+if __name__ == '__main__':
+    main()
 
+# Data and results visualisation
+# TODO: Plotting style using sns
 # Plotting Style
 sns.set_style('darkgrid')
 
@@ -194,6 +172,7 @@ plt.legend(['Train loss', 'Test Loss'], loc='upper right')
 plt.xlabel('number of training examples seen')
 plt.ylabel('negative log likelihood loss')
 fig
+plt.show()
 
 # reverse operation
 # model_new_weights = NNet()
@@ -201,6 +180,3 @@ fig
 # model_new = torch.load(ENTIRE_MODEL_FILENAME)
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
-
-# if __name__ == '__main__':
-#     main()

@@ -17,7 +17,7 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
 parser.add_argument('global_pruning', type=str, default='global_pruning', metavar='G',
                     help='A masking on all layers will be apply')
-parser.add_argument('--local_pruning', type=str, default='global_pruning', metavar='L',
+parser.add_argument('local_pruning', type=str, default='global_pruning', metavar='L',
                     help='A masking layer by layer will be apply')
 parser.add_argument('--pruning_percent', type=int, default=75, metavar='P',
                     help='percentage of pruning for each cycle (default: 10)')
