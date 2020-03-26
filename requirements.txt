@@ -1,3 +1,4 @@
+seaborn
 torch
 torchvision
 matplotlib==3.1.2

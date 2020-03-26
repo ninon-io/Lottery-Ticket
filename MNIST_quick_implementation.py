@@ -1,22 +1,19 @@
 from __future__ import print_function
+
+import argparse
+import seaborn as sns
+import matplotlib.pyplot as plt
+from time import time
+
 import torch
 import torch.nn as nn
-import torch.nn.utils
-# import torch.nn.utils.prune as prune # super cheat
 import torch.nn.functional as F
+import torch.nn.utils
 import torch.optim as optim
-import argparse
-import collections
-from collections import OrderedDict
-import seaborn as sns
-import numpy as np
-import matplotlib.pyplot as plt
-import re
-
-
-from time import time
 from torchvision import datasets
 from torchvision import transforms
+
+# import torch.nn.utils.prune as prune # super cheat
 
 # https://towardsdatascience.com/everything-you-need-to-know-about-saving-weights-in-pytorch-572651f3f8de
 # http://ttt.ircam.fr/openvpn.html
@@ -30,16 +27,12 @@ from torchvision import transforms
 
 # https://www.learnpython.org/en/ String Formatting
 
-# Plotting Style
-# sns.set_style('darkgrid')
-
-
 parser = argparse.ArgumentParser(description='Pytorch Mnist Wrapped')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=3, metavar='N',
+parser.add_argument('--epochs', type=int, default=2, metavar='N',
                     help='number of epochs to train (default: 14)')
 parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                     help='learning rate (default: 1.0)')
@@ -51,8 +44,6 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--pruning--', type=int, default=10, metavar='P',
-                    help='percentage of pruning for each cycle (default: 10)')
 parser.add_argument('--save-model', action='store_true', default=True,
                     help='For Saving the current Model')
 args = parser.parse_args()
@@ -61,6 +52,17 @@ use_cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
 
 device = torch.device("cuda" if use_cuda else "cpu")
+
+kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}  # Don't understand that
+
+# DataLoader prep
+transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
+                                transforms.Normalize((0.5,),
+                                                     (0.5,))])  # norm tensor w/  mean and standard deviation
+train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
+test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
 
 
 # Skeleton of the network
@@ -106,17 +108,18 @@ class NNet(nn.Module):
         return out_put
 
 
-model = NNet().to(device=device)
-# Check the architecture
-print(NNet)
-
-# module = model.conv1
-# print(list(module.named_parameters()))
-# print(list(module.named_buffers()))
-
-# Possible to define here:
-# optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+# Initialization
 # criterion = F.nll_loss()
+model = NNet().to(device=device)
+optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.gamma)
+
+
+# Keeping track of the progress
+train_losses = []
+train_counter = []
+test_losses = []
+test_counter = [i*len(train_loader.dataset) for i in range(args.epochs + 1)]
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -135,6 +138,9 @@ def train(args, model, device, train_loader, optimizer, epoch):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
+            train_losses.append(loss.item)
+            train_counter.append(
+                (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
 
 
 def test(args, model, device, test_loader):
@@ -150,6 +156,7 @@ def test(args, model, device, test_loader):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
+    test_losses.append(test_loss)
 
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
@@ -162,34 +169,6 @@ MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 
 def main():
     model = NNet().to(device=device)
-    print("-----Model's State dict before training-----")
-    for name, param in model.named_parameters():
-        print('name: ', name)
-        print(type(param))
-        print('param.shape: ', param.shape)
-        print('param.requires_grad: ', param.requires_grad)
-        print('=====')
-    print('-----for Conv1------')
-    module = model.conv1
-    print(list(module.named_parameters()))
-    # for module in model.named_parameters:
-    #     print(module, ':-----')
-    #     print(list(module.named_parameters()))
-    #     print(model)
-    print("----------")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-    transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
-                                    transforms.Normalize((0.5,),
-                                                         (0.5,))])  # norm tensor w/  mean and standard deviation
-    train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
-    test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
-
-    model = NNet().to(device)
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.gamma)
     time0 = time()
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader,  optimizer, epoch)
@@ -203,9 +182,22 @@ def main():
         torch.save(model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
 
+# Data and results visualisation
+
+# Plotting Style
+sns.set_style('darkgrid')
+
+fig = plt.figure
+plt.plot(train_counter, train_losses, color='blue')
+plt.scatter(test_counter, test_losses, color='red')
+plt.legend(['Train loss', 'Test Loss'], loc='upper right')
+plt.xlabel('number of training examples seen')
+plt.ylabel('negative log likelihood loss')
+fig
+
 # reverse operation
-model_new_weights = NNet()
-model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
+# model_new_weights = NNet()
+# model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model_new = torch.load(ENTIRE_MODEL_FILENAME)
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 

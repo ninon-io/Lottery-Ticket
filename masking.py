@@ -15,23 +15,22 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
 parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
-parser.add_argument('--pruning_percent', type=int, default=50, metavar='P',
-                    help='percentage of pruning for each cycle (default: 10)')
-parser.add_argument('--global_pruning', type=str, default=10, metavar='G',
-                    help='percentage of pruning for each cycle (default: 10)')
-parser.add_argument('--local_pruning', type=str, default=10, metavar='L',
+parser.add_argument('global_pruning', type=str, default='global_pruning', metavar='G',
+                    help='A masking on all layers will be apply')
+parser.add_argument('--local_pruning', type=str, default='global_pruning', metavar='L',
+                    help='A masking layer by layer will be apply')
+parser.add_argument('--pruning_percent', type=int, default=75, metavar='P',
                     help='percentage of pruning for each cycle (default: 10)')
 
 args = parser.parse_args()
 
 
-# Architecture problem as I want the call of method being an argument (cf up) associate with the class ?
-class Pruning:
+class Masking:
     def __init__(self):
-        self.modules = ['conv1', 'conv2', 'fc1', 'fc2']
+        self.modules = ['conv1', 'conv2', 'fc1', 'fc2']  # TODO: automatic iteration on layer depending the model?
         self.pruning_percent = args.pruning_percent
 
-    def __global_pruning__(self):
+    def __global_masking__(self):
         # Access of the masking value and construction of masks
         weights_array_global = getattr(model_new_weights, self.modules[0]).weight  # Get the first layer tensor
         weights_array_global = weights_array_global.view(-1)  # Reshape it
@@ -53,18 +52,18 @@ class Pruning:
         print('Masking value:', masking_value)
 
         # Creation of layers' masks and generation of new weights layer by layer
-        pruned_state_dict = []
-        for layer in self.modules:
+        masked_state_dict = []
+        for layer in self.modules:  # TODO: Redundancy of variable?
             weights_array_local = getattr(model_new_weights, layer).weight
             abs_weights_array_local = torch.Tensor.abs(weights_array_local)
             mask_tensor = abs_weights_array_local.ge(masking_value).int()
             masked_weights = weights_array_local*mask_tensor
-            pruned_state_dict.append(masked_weights)
+            masked_state_dict.append(masked_weights)
 
-        print('genius')
+        print('genius global')
 
-    def __local_pruning__(self):
-        pruned_state_dict = []
+    def __local_masking__(self):
+        masked_state_dict = []
         for layer in self.modules:
             weights_array_local = getattr(model_new_weights, layer).weight  # Get the weight of each layer
             abs_tensor = torch.Tensor.abs(weights_array_local)  # Compute the absolute value
@@ -75,15 +74,21 @@ class Pruning:
             print('MASKING VALUE', masking_value)
             mask_tensor = abs_tensor.ge(masking_value).int()  # Get the mask tensor
             masked_weights = weights_array_local*mask_tensor  # Compute the new weights tensors
-            pruned_state_dict.append(masked_weights)
+            masked_state_dict.append(masked_weights)
 
-        print('genius')
+        print('genius local')
 
 
-test_1 = Pruning()
-test_1.__global_pruning__()
-# test_1.__local_pruning__()
+if args.global_pruning:
+    test = Masking()
+    test.__global_masking__()
+else:
+    test = Masking()
+    test.__local_masking__()
 
+
+# TODO: Link the new_state_dict to MNIST model and train it again!
+# TODO: Print and plot results to compare!
 
 # Somehow better method to change boolean tensor into int tensor => Indeed .int()
 # for i in range(len(mask_bool)):
