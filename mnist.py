@@ -8,9 +8,8 @@ import torch.nn.functional as F
 
 # Skeleton of the network
 class NNet(nn.Module):
-    def __init__(self, train_loader):
+    def __init__(self):
         super(NNet, self).__init__()
-        self.train_loader = train_loader
         self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.dropout = nn.Dropout2d()

@@ -2,9 +2,12 @@ import torch
 from torch import optim
 from torch.nn import functional as F
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 from mnist import NNet
 
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.01  # TODO: Find a way to link them with argparse in main
 MOMENTUM = 0.5
 
 
@@ -16,9 +19,14 @@ class Learn:
         self.model = NNet().to(device=self.device)
         self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
         self.batch_size = batch_size
+        self.n_epochs = 2
         self.epoch = 0
         self.train_loader = train_loader
         self.test_loader = test_loader
+        self.train_counter = []
+        self.train_losses = []
+        self.test_losses = []
+        self.test_counter = [i * len(self.train_loader.dataset) for i in range(self.n_epochs + 1)]
 
     def run(self, data):
         data.to(self.device)
@@ -26,9 +34,10 @@ class Learn:
         return self.model(data)
 
     def train(self, log_interval=10):
-        train_losses = []
-        train_counter = []
+        self.train_losses = []
+        self.train_counter = []
         self.model.train()
+        self.epoch += 1
         for batch_idx, (data, target) in enumerate(self.train_loader):
             data, target = data.to(self.device), target.to(self.device)
             # Training pass
@@ -41,18 +50,19 @@ class Learn:
             self.optimizer.step()  # Gradient descend step accordingly to the backward propagation
             if batch_idx % log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    self.epoch, batch_idx * len(data), len(self.train_loader.dataset),
+                    self.epoch, batch_idx * len(data), len(self.train_loader.dataset),  # TODO : get good self.epoch from main
                                 100. * batch_idx / len(self.train_loader), loss.item()))
-                train_losses.append(loss.item())
-                train_counter.append(
+                self.train_losses.append(loss.item())
+                self.train_counter.append(
                     (batch_idx * 64) + ((self.epoch - 1) * len(self.train_loader.dataset)))
 
     def test(self):
-        test_losses = []
-        test_counter = [i * len(self.train_loader.dataset) for i in range(self.epoch + 1)]
+        self.test_losses = []
+        self.test_counter = [i * len(self.train_loader.dataset) for i in range(self.epoch + 1)]
         self.model.eval()
         test_loss = 0
         correct = 0
+        self.epoch += 1
         with torch.no_grad():  # Disable autograd functionality (error gradients and back-propagation calculation)
             for data, target in self.test_loader:
                 data, target = data.to(self.device), target.to(self.device)
@@ -61,8 +71,20 @@ class Learn:
                 pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
         test_loss /= len(self.test_loader.dataset)
-        test_losses.append(test_loss)
+        self.test_losses.append(test_loss)
         print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
             test_loss, correct, len(self.test_loader.dataset),
             100. * correct / len(self.test_loader.dataset)))
+
+    def plot(self):
+        sns.set_style('darkgrid')
+        plt.figure()
+        plt.plot(self.train_counter, self.train_losses, color='blue')  # TODO: Get them :(
+        plt.scatter(self.test_counter, self.test_losses, color='red')
+        plt.legend(['Train loss', 'Test Loss'], loc='upper right')
+        plt.xlabel('number of training examples seen')
+        plt.ylabel('negative log likelihood loss')
+        sns.set_context('paper')  # for saving the figure
+        sns.set()
+        plt.show()
 
