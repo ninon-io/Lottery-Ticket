@@ -1,9 +1,10 @@
 from __future__ import print_function
 import torch
 import torch.nn.utils
-from MNIST_quick_implementation import NNet
+from mnist_quick_implementation import NNet
 import math
 import argparse
+import pickle
 
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
@@ -15,9 +16,9 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
 parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
-parser.add_argument('global_pruning', type=str, default='global_pruning', metavar='G',
+parser.add_argument('--global_pruning', type=str, default='global_pruning', metavar='G',
                     help='A masking on all layers will be apply')
-parser.add_argument('local_pruning', type=str, default='global_pruning', metavar='L',
+parser.add_argument('--local_pruning', type=str, default='global_pruning', metavar='L',
                     help='A masking layer by layer will be apply')
 parser.add_argument('--pruning_percent', type=int, default=75, metavar='P',
                     help='percentage of pruning for each cycle (default: 10)')
@@ -59,7 +60,7 @@ class Masking:
             mask_tensor = abs_weights_array_local.ge(masking_value).int()
             masked_weights = weights_array_local*mask_tensor
             masked_state_dict.append(masked_weights)
-
+        pickle.dump(masked_state_dict, open("masked_state_dict_global_1.pt", "wb"))
         print('genius global')
 
     def __local_masking__(self):
@@ -75,16 +76,17 @@ class Masking:
             mask_tensor = abs_tensor.ge(masking_value).int()  # Get the mask tensor
             masked_weights = weights_array_local*mask_tensor  # Compute the new weights tensors
             masked_state_dict.append(masked_weights)
-
+        pickle.dump(masked_state_dict, open("masked_state_dict_local.pt", "wb"))
         print('genius local')
 
 
-if args.global_pruning:
-    test = Masking()
-    test.__global_masking__()
-else:
-    test = Masking()
-    test.__local_masking__()
+def masking():
+    if args.global_pruning:
+        test = Masking()
+        test.__global_masking__()
+    else:
+        test = Masking()
+        test.__local_masking__()
 
 
 # TODO: Link the new_state_dict to MNIST model and train it again!
