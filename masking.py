@@ -1,7 +1,7 @@
 from __future__ import print_function
 import torch
 import torch.nn.utils
-from mnist_quick_implementation import NNet
+from mnist import NNet
 import math
 import argparse
 import pickle

@@ -4,9 +4,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from torchvision import datasets
 from torchvision import transforms
-
-import mnist_quick_implementation as mnist
-from mnist_quick_implementation import NNet
+import torch.nn.utils
+import mnist
+from mnist import NNet
 from masking import *
 
 # get the arguments, if not on command line, the arguments are the default
@@ -53,7 +53,7 @@ test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
 
 
 def main():
-    model = mnist.NNet().to(device=device)
+    model = NNet().to(device=device)
     time0 = time()
     mnist.test()
     for epoch in range(1, args.epochs + 1):
@@ -70,7 +70,7 @@ def main():
     # TODO: Plotting style using sns
     # Plotting Style
     sns.set_style('darkgrid')
-    plt.figure
+    plt.figure()
     plt.plot(mnist.train_counter, mnist.train_losses, color='blue')
     plt.scatter(mnist.test_counter, mnist.test_losses, color='red')
     plt.legend(['Train loss', 'Test Loss'], loc='upper right')

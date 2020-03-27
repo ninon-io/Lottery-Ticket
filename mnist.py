@@ -6,10 +6,6 @@ import torch.nn.functional as F
 import torch.nn.utils
 import torch.optim as optim
 import main as main
-
-
-from masking import Masking
-
 # import torch.nn.utils.prune as prune # super cheat
 
 
@@ -89,10 +85,4 @@ def test():
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 
-
-# reverse operation
-# model_new_weights = NNet()
-# model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
-# model_new = torch.load(ENTIRE_MODEL_FILENAME)
-# model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
