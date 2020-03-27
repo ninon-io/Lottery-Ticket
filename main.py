@@ -5,9 +5,12 @@ import matplotlib.pyplot as plt
 from torchvision import datasets
 from torchvision import transforms
 import torch.nn.utils
-import mnist
-from mnist import NNet
-from masking import *
+
+from learn import Learn
+# from masking import Masking
+
+ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
+MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 
 # get the arguments, if not on command line, the arguments are the default
 parser = argparse.ArgumentParser(description='Pytorch Mnist Wrapped')
@@ -35,44 +38,38 @@ parser.add_argument('--momentum', type=float, default=0.5,
 args = parser.parse_args()
 
 use_cuda = not args.no_cuda and torch.cuda.is_available()
-
-torch.manual_seed(args.seed)
-
-device = torch.device("cuda" if use_cuda else "cpu")
-
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}  # Don't understand that
 
-# DataLoader prep
-transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
-                                transforms.Normalize((0.1307,),
-                                                     (0.3081,))])  # norm tensor w/  mean and standard deviation
-train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
-test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
 
-
-def main():
-    model = NNet().to(device=device)
+if __name__ == "__main__":
+    # DataLoader prep
+    transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
+                                    transforms.Normalize((0.1307,),
+                                                         (0.3081,))])  # norm tensor w/  mean and standard deviation
+    train_set = datasets.MNIST(root='./dataset_MNIST', download=True, train=True, transform=transform)
+    test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
+    learn = Learn(train_loader, test_loader, batch_size=args.batch_size, seed=args.seed, cuda=use_cuda)
     time0 = time()
-    mnist.test()
+    learn.test()
     for epoch in range(1, args.epochs + 1):
-        mnist.train(epoch)
-        mnist.test()
+        learn.train(epoch)
+        learn.test()
 
     # Saving models
     print("\nTraining Time (in minutes) =", (time() - time0) / 60)
     if args.save_model:
-        torch.save(model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
-        torch.save(model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
+        torch.save(learn.model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
+        torch.save(learn.model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
     # Data and results visualisation
     # TODO: Plotting style using sns
     # Plotting Style
     sns.set_style('darkgrid')
     plt.figure()
-    plt.plot(mnist.train_counter, mnist.train_losses, color='blue')
-    plt.scatter(mnist.test_counter, mnist.test_losses, color='red')
+    plt.plot(learn.train_counter, learn.train_losses, color='blue')  # TODO: Get them :(
+    plt.scatter(learn.test_counter, learn.test_losses, color='red')
     plt.legend(['Train loss', 'Test Loss'], loc='upper right')
     plt.xlabel('number of training examples seen')
     plt.ylabel('negative log likelihood loss')
@@ -81,8 +78,5 @@ def main():
     plt.show()
 
     # Generate new state dict with masked weights
-    Masking.masking()
+    # Masking.masking()
 
-
-if __name__ == '__main__':
-    main()
