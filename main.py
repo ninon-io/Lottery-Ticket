@@ -1,7 +1,5 @@
 from time import time
 import argparse
-import seaborn as sns
-import matplotlib.pyplot as plt
 from torchvision import datasets
 from torchvision import transforms
 import torch.nn.utils
@@ -18,7 +16,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=2, metavar='N',
+parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 14)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 1.0)')
@@ -53,11 +51,7 @@ if __name__ == "__main__":
     learn = Learn(train_loader, test_loader, batch_size=args.batch_size, seed=args.seed, cuda=use_cuda)
     time0 = time()
     learn.test()
-    # To get info every batch
-    # for epoch in range(1, args.epochs + 1):
-    #     learn.train(epoch)
-    #     learn.test()
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(0, args.epochs):
         learn.train()
         learn.test()
     learn.plot()
@@ -67,21 +61,5 @@ if __name__ == "__main__":
     if args.save_model:
         torch.save(learn.model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
         torch.save(learn.model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
-    #
-    # # Data and results visualisation
-    # # TODO: Plotting style using sns
-    # # Plotting Style
-    # sns.set_style('darkgrid')
-    # plt.figure()
-    # plt.plot(learn.train_counter, learn.train_losses, color='blue')  # TODO: Get them :(
-    # plt.scatter(learn.test_counter, learn.test_losses, color='red')
-    # plt.legend(['Train loss', 'Test Loss'], loc='upper right')
-    # plt.xlabel('number of training examples seen')
-    # plt.ylabel('negative log likelihood loss')
-    # sns.set_context('paper')  # for saving the figure
-    # sns.set()
-    # plt.show()
 
-    # Generate new state dict with masked weights
-    # Masking.masking()
 

@@ -19,7 +19,7 @@ class Learn:
         self.model = NNet().to(device=self.device)
         self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
         self.batch_size = batch_size
-        self.n_epochs = 2
+        self.n_epochs = 1
         self.epoch = 0
         self.train_loader = train_loader
         self.test_loader = test_loader
@@ -28,16 +28,13 @@ class Learn:
         self.test_losses = []
         self.test_counter = [i * len(self.train_loader.dataset) for i in range(self.n_epochs + 1)]
 
-    def run(self, data):
-        data.to(self.device)
-        self.optimizer.zero_grad()
-        return self.model(data)
+    # def run(self, data):
+    #     data.to(self.device)
+    #     self.optimizer.zero_grad()
+    #     return self.model(data)
 
     def train(self, log_interval=10):
-        self.train_losses = []
-        self.train_counter = []
         self.model.train()
-        self.epoch += 1
         for batch_idx, (data, target) in enumerate(self.train_loader):
             data, target = data.to(self.device), target.to(self.device)
             # Training pass
@@ -50,14 +47,14 @@ class Learn:
             self.optimizer.step()  # Gradient descend step accordingly to the backward propagation
             if batch_idx % log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    self.epoch, batch_idx * len(data), len(self.train_loader.dataset),  # TODO : get good self.epoch from main
+                    self.epoch, batch_idx * len(data), len(self.train_loader.dataset),
                                 100. * batch_idx / len(self.train_loader), loss.item()))
                 self.train_losses.append(loss.item())
                 self.train_counter.append(
                     (batch_idx * 64) + ((self.epoch - 1) * len(self.train_loader.dataset)))
 
     def test(self):
-        self.test_losses = []
+        # self.test_losses = []
         self.test_counter = [i * len(self.train_loader.dataset) for i in range(self.epoch + 1)]
         self.model.eval()
         test_loss = 0
@@ -79,12 +76,11 @@ class Learn:
     def plot(self):
         sns.set_style('darkgrid')
         plt.figure()
-        plt.plot(self.train_counter, self.train_losses, color='blue')  # TODO: Get them :(
+        plt.plot(self.train_counter, self.train_losses, color='blue')
         plt.scatter(self.test_counter, self.test_losses, color='red')
         plt.legend(['Train loss', 'Test Loss'], loc='upper right')
         plt.xlabel('number of training examples seen')
         plt.ylabel('negative log likelihood loss')
-        sns.set_context('paper')  # for saving the figure
+        sns.set_context('paper')  # saves the figure eventually
         sns.set()
         plt.show()
-
