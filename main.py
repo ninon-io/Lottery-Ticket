@@ -5,10 +5,13 @@ from torchvision import transforms
 import torch.nn.utils
 
 from learn import Learn
-# from masking import Masking
+from masking import masking
 
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
+
+ENTIRE_MODEL_MASKED = "mnist_masked.pt"
+MODEL_WEIGHTS_MASKED = "mnist_weights_masked.pt"
 
 # get the arguments, if not on command line, the arguments are the default
 parser = argparse.ArgumentParser(description='Pytorch Mnist Wrapped')
@@ -49,8 +52,13 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
     learn = Learn(train_loader, test_loader, batch_size=args.batch_size, seed=args.seed, cuda=use_cuda)
+    # Set the time
     time0 = time()
-    learn.test()
+    # Initial training of the model
+    print(' ==================')
+    print('| INITIAL TRAINING |')
+    print(' ==================')
+    learn.test()  # First test on randomly initialized data
     for epoch in range(0, args.epochs):
         learn.train()
         learn.test()
@@ -61,5 +69,33 @@ if __name__ == "__main__":
     if args.save_model:
         torch.save(learn.model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
         torch.save(learn.model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
+
+    # Masking the weights
+    print(' ===================')
+    print('| MASKING PROCEDURE |')
+    print(' ===================')
+    masking()
+
+    # Retrain the model with masked weight in state dict TODO: find a way to train from beginning and not resume --'
+    print(' =================')
+    print('| MASKED TRAINING |')
+    print(' =================')
+    learn.test()
+    for epoch in range(0, args.epochs):
+        learn.train()
+        learn.test()
+    learn.plot()
+
+    # Set the time again
+    time0 = time()
+    # Saving sparser models
+    print("\nTraining Time (in minutes) =", (time() - time0) / 60)
+    if args.save_model:
+        torch.save(learn.model.state_dict(), MODEL_WEIGHTS_MASKED)  # saves only the weights
+        torch.save(learn.model, ENTIRE_MODEL_MASKED)  # saves all the architecture
+
+
+
+
 
 

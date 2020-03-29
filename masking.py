@@ -9,11 +9,11 @@ import pickle
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
 
-# Load the trained model
+# Load the trained model state dict
 model_new_weights = NNet()
 model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
-# model_new = torch.load(ENTIRE_MODEL_FILENAME)
-# model.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
+# model_new = NNet()
+# model_new.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
 parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
 parser.add_argument('--global_pruning', type=str, default='global_pruning', metavar='G',
@@ -60,8 +60,17 @@ class Masking:
             mask_tensor = abs_weights_array_local.ge(masking_value).int()
             masked_weights = weights_array_local*mask_tensor
             masked_state_dict.append(masked_weights)
-        pickle.dump(masked_state_dict, open("masked_state_dict_global_1.pt", "wb"))
         print('genius global')
+
+        # Update the model state dict
+        model_dict = model_new_weights.state_dict()
+        cpt = 0
+        for (key, tensor) in model_dict.items():
+            if 'weight' in key:
+                model_dict[key] = masked_state_dict[cpt]
+                cpt += 1
+        print('NEW MODEL DICT', model_dict)
+        print('genius this is the end')
 
     def __local_masking__(self):
         masked_state_dict = []
@@ -78,6 +87,16 @@ class Masking:
             masked_state_dict.append(masked_weights)
         pickle.dump(masked_state_dict, open("masked_state_dict_local.pt", "wb"))
         print('genius local')
+
+        # Update the model state dict
+        model_dict = model_new_weights.state_dict()
+        cpt = 0
+        for (key, tensor) in model_dict.items():
+            if 'weight' in key:
+                model_dict[key] = masked_state_dict[cpt]
+                cpt += 1
+        print('NEW MODEL DICT', model_dict)
+        print('genius this is the end')
 
 
 def masking():
