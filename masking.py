@@ -6,8 +6,14 @@ import math
 import argparse
 import pickle
 
+INITIAL_MODEL = 'initial_model.pt'
+
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
+
+# Load the initial model state dict
+initial_model = NNet()
+initial_model.load_state_dict((torch.load(INITIAL_MODEL)))
 
 # Load the trained model state dict
 model_new_weights = NNet()
@@ -20,7 +26,7 @@ parser.add_argument('--global_pruning', type=str, default='global_pruning', meta
                     help='A masking on all layers will be apply')
 parser.add_argument('--local_pruning', type=str, default='global_pruning', metavar='L',
                     help='A masking layer by layer will be apply')
-parser.add_argument('--pruning_percent', type=int, default=75, metavar='P',
+parser.add_argument('--pruning_percent', type=int, default=99.7, metavar='P',
                     help='percentage of pruning for each cycle (default: 10)')
 
 args = parser.parse_args()
@@ -33,6 +39,7 @@ class Masking:
 
     def __global_masking__(self):
         # Access of the masking value and construction of masks
+        print('INITIAL DICT', initial_model.state_dict())
         weights_array_global = getattr(model_new_weights, self.modules[0]).weight  # Get the first layer tensor
         weights_array_global = weights_array_global.view(-1)  # Reshape it
         print('Tensors local number of elements: ', weights_array_global.numel())
@@ -47,7 +54,7 @@ class Masking:
         # Computation of the masking limit
         print(torch.sort(weights_array_global))
         print('Tensors global number of elements: ', weights_array_global.numel())
-        ranked_tensor = torch.sort(weights_array_global)
+        ranked_tensor = torch.sort(weights_array_global)  # Sort the global tensor
         # Get the limit value for masking
         masking_value = ranked_tensor[0][math.floor(ranked_tensor[0].numel() * self.pruning_percent / 100)]
         print('Masking value:', masking_value)
@@ -55,19 +62,20 @@ class Masking:
         # Creation of layers' masks and generation of new weights layer by layer
         masked_state_dict = []
         for layer in self.modules:  # TODO: Redundancy of variable?
-            weights_array_local = getattr(model_new_weights, layer).weight
-            abs_weights_array_local = torch.Tensor.abs(weights_array_local)
-            mask_tensor = abs_weights_array_local.ge(masking_value).int()
-            masked_weights = weights_array_local*mask_tensor
-            masked_state_dict.append(masked_weights)
+            initial_weights = getattr(initial_model, layer).weight  # Get the initial weights
+            weights_array_local = getattr(model_new_weights, layer).weight  # Get the trained weights
+            abs_weights_array_local = torch.Tensor.abs(weights_array_local)  # Abs value of trained weights
+            mask_tensor = abs_weights_array_local.ge(masking_value).int()  # Mask the lower weights after training
+            masked_weights = initial_weights*mask_tensor  # Mask the future lower weights in the initial tensors
+            masked_state_dict.append(masked_weights)  # Create dict with new tensors to inject in state dict
         print('genius global')
 
-        # Update the model state dict
-        model_dict = model_new_weights.state_dict()
+        # Update the initial model state dict
+        model_dict = initial_model.state_dict()  # Get the all state dict before training
         cpt = 0
         for (key, tensor) in model_dict.items():
             if 'weight' in key:
-                model_dict[key] = masked_state_dict[cpt]
+                model_dict[key] = masked_state_dict[cpt]  # Replace the initial weights tensor by the masked ones
                 cpt += 1
         print('NEW MODEL DICT', model_dict)
         print('genius this is the end')
@@ -107,9 +115,6 @@ def masking():
         test = Masking()
         test.__local_masking__()
 
-
-# TODO: Link the new_state_dict to MNIST model and train it again!
-# TODO: Print and plot results to compare!
 
 # Somehow better method to change boolean tensor into int tensor => Indeed .int()
 # for i in range(len(mask_bool)):

@@ -26,3 +26,4 @@ class NNet(nn.Module):
         x = self.fc2(x)
         out_put = F.log_softmax(x, dim=1)
         return out_put
+

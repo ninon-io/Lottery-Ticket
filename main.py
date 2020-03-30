@@ -5,7 +5,9 @@ from torchvision import transforms
 import torch.nn.utils
 
 from learn import Learn
-from masking import masking
+from learn import weights_init
+
+INITIAL_MODEL = 'initial_model.pt'
 
 ENTIRE_MODEL_FILENAME = "mnist_cnn.pt"
 MODEL_WEIGHTS = "mnist_weights_cnn.pt"
@@ -55,6 +57,8 @@ if __name__ == "__main__":
     # Set the time
     time0 = time()
     # Initial training of the model
+    learn.model.apply(weights_init)  # Random Initialization of weights
+    torch.save(learn.model.state_dict(), INITIAL_MODEL)  # Saves this random init
     print(' ==================')
     print('| INITIAL TRAINING |')
     print(' ==================')
@@ -70,16 +74,19 @@ if __name__ == "__main__":
         torch.save(learn.model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
         torch.save(learn.model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
-    # Masking the weights
+    from masking import masking
+
+    # Mask the weights
     print(' ===================')
     print('| MASKING PROCEDURE |')
     print(' ===================')
     masking()
 
-    # Retrain the model with masked weight in state dict TODO: find a way to train from beginning and not resume --'
+    # Retrain the model with masked weight in state dict
     print(' =================')
     print('| MASKED TRAINING |')
     print(' =================')
+    model_state_dict = learn.model.load_state_dict(torch.load(INITIAL_MODEL))
     learn.test()
     for epoch in range(0, args.epochs):
         learn.train()

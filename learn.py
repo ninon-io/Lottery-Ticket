@@ -1,5 +1,6 @@
 import torch
 from torch import optim
+import torch.nn as nn
 from torch.nn import functional as F
 
 import seaborn as sns
@@ -9,6 +10,11 @@ from mnist import NNet
 
 LEARNING_RATE = 0.01  # TODO: Find a way to link them with argparse in main
 MOMENTUM = 0.5
+
+
+def weights_init(m):
+    if isinstance(m, nn.Conv2d):
+        nn.init.xavier_uniform_(m.weight.data)
 
 
 class Learn:
