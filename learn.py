@@ -8,9 +8,6 @@ import matplotlib.pyplot as plt
 
 from mnist import NNet
 
-LEARNING_RATE = 0.01  # TODO: Find a way to link them with argparse in main
-MOMENTUM = 0.5
-
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
@@ -18,12 +15,12 @@ def weights_init(m):
 
 
 class Learn:
-    def __init__(self, train_loader, test_loader, batch_size=64, seed=1, cuda=False):
+    def __init__(self, train_loader, test_loader, batch_size=64, seed=1, cuda=False, lr=0.01, momentum=0.5):
         torch.manual_seed(seed)
         self.device = torch.device("cuda" if cuda else "cpu")
         # Initialization
         self.model = NNet().to(device=self.device)
-        self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+        self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=momentum)
         self.batch_size = batch_size
         self.n_epochs = 1
         self.epoch = 0

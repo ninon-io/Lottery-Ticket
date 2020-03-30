@@ -25,8 +25,8 @@ parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 14)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 1.0)')
-parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
-                    help='Learning rate step gamma (default: 0.7)')
+parser.add_argument('--momentum', type=float, default=0.5,
+                    help='Momentum (defaults: 0.5)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
@@ -35,13 +35,14 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--save-model', action='store_true', default=True,
                     help='For Saving the current Model')
-parser.add_argument('--momentum', type=float, default=0.5,
-                    help='For Saving the current Model')
+parser.add_argument('--local', dest='local', default=False, action='store_true')
+parser.add_argument('--pruning_percent', type=int, default=99.7, metavar='P',
+                    help='percentage of pruning for each cycle (default: 10)')
 
 args = parser.parse_args()
 
 use_cuda = not args.no_cuda and torch.cuda.is_available()
-kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}  # Don't understand that
+kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 
 if __name__ == "__main__":
@@ -53,7 +54,8 @@ if __name__ == "__main__":
     test_set = datasets.MNIST(root='./testset_MNIST', download=True, train=False, transform=transform)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=64, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=True)
-    learn = Learn(train_loader, test_loader, batch_size=args.batch_size, seed=args.seed, cuda=use_cuda)
+    learn = Learn(train_loader, test_loader, batch_size=args.batch_size,
+                  seed=args.seed, cuda=use_cuda, lr=args.lr, momentum=args.momentum)
     # Set the time
     time0 = time()
     # Initial training of the model
@@ -74,13 +76,17 @@ if __name__ == "__main__":
         torch.save(learn.model.state_dict(), MODEL_WEIGHTS)  # saves only the weights
         torch.save(learn.model, ENTIRE_MODEL_FILENAME)  # saves all the architecture
 
-    from masking import masking
+    from masking import Masking
 
     # Mask the weights
     print(' ===================')
     print('| MASKING PROCEDURE |')
     print(' ===================')
-    masking()
+    Masking(args.pruning_percent)
+    if args['local']:
+        Masking.global_pruning()
+    else:
+        Masking.local_pruning()
 
     # Retrain the model with masked weight in state dict
     print(' =================')

@@ -21,21 +21,11 @@ model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS))
 # model_new = NNet()
 # model_new.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
-parser = argparse.ArgumentParser(description='Pruning Algorithm for MNIST')
-parser.add_argument('--global_pruning', type=str, default='global_pruning', metavar='G',
-                    help='A masking on all layers will be apply')
-parser.add_argument('--local_pruning', type=str, default='global_pruning', metavar='L',
-                    help='A masking layer by layer will be apply')
-parser.add_argument('--pruning_percent', type=int, default=99.7, metavar='P',
-                    help='percentage of pruning for each cycle (default: 10)')
-
-args = parser.parse_args()
-
 
 class Masking:
-    def __init__(self):
+    def __init__(self, pruning_percent):
         self.modules = ['conv1', 'conv2', 'fc1', 'fc2']  # TODO: automatic iteration on layer depending the model?
-        self.pruning_percent = args.pruning_percent
+        self.pruning_percent = pruning_percent
 
     def __global_masking__(self):
         # Access of the masking value and construction of masks
@@ -105,15 +95,6 @@ class Masking:
                 cpt += 1
         print('NEW MODEL DICT', model_dict)
         print('genius this is the end')
-
-
-def masking():
-    if args.global_pruning:
-        test = Masking()
-        test.__global_masking__()
-    else:
-        test = Masking()
-        test.__local_masking__()
 
 
 # Somehow better method to change boolean tensor into int tensor => Indeed .int()
