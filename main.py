@@ -44,7 +44,6 @@ args = parser.parse_args()
 use_cuda = not args.no_cuda and torch.cuda.is_available()
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-
 if __name__ == "__main__":
     # DataLoader prep
     transform = transforms.Compose([transforms.ToTensor(),  # converts image into numbers and then into tensor
@@ -106,9 +105,3 @@ if __name__ == "__main__":
     if args.save_model:
         torch.save(learn.model.state_dict(), MODEL_WEIGHTS_MASKED)  # saves only the weights
         torch.save(learn.model, ENTIRE_MODEL_MASKED)  # saves all the architecture
-
-
-
-
-
-

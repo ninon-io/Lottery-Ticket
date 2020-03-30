@@ -18,6 +18,8 @@ initial_model.load_state_dict((torch.load(INITIAL_MODEL_FILENAME)))
 # Load the trained model state dict
 model_new_weights = NNet()
 model_new_weights.load_state_dict(torch.load(MODEL_WEIGHTS_FILENAME))
+
+
 # model_new = NNet()
 # model_new.load_state_dict(torch.load(ENTIRE_MODEL_FILENAME))
 
@@ -55,7 +57,7 @@ class Masking:
             weights_array_local = getattr(model_new_weights, layer).weight  # Get the trained weights
             abs_weights_array_local = torch.Tensor.abs(weights_array_local)  # Abs value of trained weights
             mask_tensor = abs_weights_array_local.ge(masking_value).int()  # Mask the lower weights after training
-            masked_weights = initial_weights*mask_tensor  # Mask the future lower weights in the initial tensors
+            masked_weights = initial_weights * mask_tensor  # Mask the future lower weights in the initial tensors
             masked_state_dict.append(masked_weights)  # Create dict with new tensors to inject in state dict
 
         # Update the initial model state dict
@@ -79,7 +81,7 @@ class Masking:
             masking_value = mask_construction[0][math.floor(mask_construction[0].numel() * self.pruning_percent / 100)]
             print('MASKING VALUE', masking_value)
             mask_tensor = abs_tensor.ge(masking_value).int()  # Get the mask tensor
-            masked_weights = initial_weights*mask_tensor  # Compute the new weights tensors
+            masked_weights = initial_weights * mask_tensor  # Compute the new weights tensors
             masked_state_dict.append(masked_weights)
 
         # Update the model state dict
@@ -90,7 +92,6 @@ class Masking:
                 model_dict[key] = masked_state_dict[cpt]
                 cpt += 1
         print('NEW MODEL DICT', model_dict)
-
 
 # Somehow better method to change boolean tensor into int tensor => Indeed .int()
 # for i in range(len(mask_bool)):

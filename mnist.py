@@ -3,6 +3,7 @@ from __future__ import print_function
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 # import torch.nn.utils.prune as prune # super cheat
 
 
@@ -16,7 +17,7 @@ class NNet(nn.Module):
         self.fc1 = nn.Linear(320, 50)
         self.fc2 = nn.Linear(50, 10)
 
-# How the data flow in the network
+    # How the data flow in the network
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.dropout(self.conv2(x)), 2))
@@ -26,4 +27,3 @@ class NNet(nn.Module):
         x = self.fc2(x)
         out_put = F.log_softmax(x, dim=1)
         return out_put
-
