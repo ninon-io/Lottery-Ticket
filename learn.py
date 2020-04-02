@@ -56,7 +56,7 @@ class Learn:
         for batch_idx, (data, target) in enumerate(self.train_loader):
             data, target = data.to(self.device), target.to(self.device)
             # Training pass
-            self.optimizer.zero_grad()  # Initialization of weights TO MODIFY IN ORDER TO RESET WEIGHTS NOT TO ZEROS
+            self.optimizer.zero_grad()  # Initialization of weights
             output = self.model(data)
             loss = F.nll_loss(output, target)  # Equivalent to criterion: loss = criterion(output, target)
             # Learning with back-propagation
@@ -90,7 +90,7 @@ class Learn:
             test_loss, correct, len(self.test_loader.dataset),
             100. * correct / len(self.test_loader.dataset)))
 
-    def plot(self):
+    def plot(self):  # TODO: make the plot more cute
         sns.set_style('darkgrid')
         plt.figure()
         plt.plot(self.train_counter, self.train_losses, color='blue')
